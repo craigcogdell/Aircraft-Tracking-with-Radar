@@ -1,0 +1,633 @@
+:root {
+    --bg-dark: #070c08;
+    --bg-panel: rgba(10, 20, 14, 0.88);
+    --bg-card: rgba(14, 28, 20, 0.75);
+    --border-color: rgba(0, 255, 102, 0.3);
+    --border-bright: rgba(0, 255, 102, 0.8);
+    --primary: #00ff66;
+    --primary-glow: rgba(0, 255, 102, 0.45);
+    --primary-dim: rgba(0, 255, 102, 0.15);
+    --text-color: #d0f8df;
+    --text-dim: #6da583;
+    --accent-amber: #ffb700;
+    --accent-red: #ff3344;
+    --accent-cyan: #00f0ff;
+    --font-mono: "Share Tech Mono", "Roboto Mono", "Courier New", monospace;
+}
+
+/* Color Themes */
+body.theme-amber {
+    --bg-dark: #0c0a06;
+    --bg-panel: rgba(22, 17, 10, 0.88);
+    --bg-card: rgba(32, 24, 14, 0.75);
+    --border-color: rgba(255, 180, 0, 0.35);
+    --border-bright: rgba(255, 180, 0, 0.9);
+    --primary: #ffaa00;
+    --primary-glow: rgba(255, 170, 0, 0.45);
+    --primary-dim: rgba(255, 170, 0, 0.15);
+    --text-color: #ffe6b3;
+    --text-dim: #a68449;
+}
+
+body.theme-cyan {
+    --bg-dark: #050b10;
+    --bg-panel: rgba(8, 20, 30, 0.88);
+    --bg-card: rgba(12, 30, 45, 0.75);
+    --border-color: rgba(0, 230, 255, 0.35);
+    --border-bright: rgba(0, 230, 255, 0.9);
+    --primary: #00e5ff;
+    --primary-glow: rgba(0, 229, 255, 0.45);
+    --primary-dim: rgba(0, 229, 255, 0.15);
+    --text-color: #d1f7ff;
+    --text-dim: #5a8f9e;
+}
+
+body.theme-red {
+    --bg-dark: #120406;
+    --bg-panel: rgba(28, 8, 12, 0.9);
+    --bg-card: rgba(40, 12, 18, 0.75);
+    --border-color: rgba(255, 45, 75, 0.35);
+    --border-bright: rgba(255, 45, 75, 0.9);
+    --primary: #ff3355;
+    --primary-glow: rgba(255, 51, 85, 0.45);
+    --primary-dim: rgba(255, 51, 85, 0.15);
+    --text-color: #ffd6dc;
+    --text-dim: #a35b68;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+}
+
+body {
+    background-color: var(--bg-dark);
+    color: var(--text-color);
+    font-family: var(--font-mono);
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* CRT Scanline and Vignette Effects */
+.crt-overlay {
+    pointer-events: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+                radial-gradient(circle at center, transparent 65%, rgba(0, 0, 0, 0.6) 100%);
+    background-size: 100% 4px, 100% 100%;
+    z-index: 9999;
+}
+
+/* Top Navigation / Telemetry Header */
+.top-header {
+    height: 54px;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    z-index: 100;
+    backdrop-filter: blur(8px);
+}
+
+.logo-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.radar-icon-pulse {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--primary);
+    box-shadow: 0 0 12px var(--primary);
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(0.85); opacity: 0.7; }
+    50% { transform: scale(1.15); opacity: 1; filter: drop-shadow(0 0 8px var(--primary)); }
+    100% { transform: scale(0.85); opacity: 0.7; }
+}
+
+.app-title {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--primary);
+    text-shadow: 0 0 8px var(--primary-glow);
+}
+
+.app-subtitle {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+}
+
+.telemetry-strip {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+}
+
+.telemetry-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.telemetry-label {
+    font-size: 9px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.telemetry-value {
+    font-size: 14px;
+    font-weight: bold;
+    color: var(--primary);
+}
+
+.telemetry-value.highlight {
+    color: var(--accent-amber);
+}
+
+.telemetry-value.emergency-alert {
+    color: var(--accent-red);
+    animation: emergencyBlink 0.8s infinite;
+}
+
+@keyframes emergencyBlink {
+    0%, 100% { opacity: 1; text-shadow: 0 0 12px var(--accent-red); }
+    50% { opacity: 0.3; }
+}
+
+.header-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+/* Buttons */
+.btn-tactical {
+    background: var(--primary-dim);
+    border: 1px solid var(--border-color);
+    color: var(--primary);
+    padding: 6px 12px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-tactical:hover {
+    background: var(--primary);
+    color: var(--bg-dark);
+    box-shadow: 0 0 10px var(--primary-glow);
+    border-color: var(--primary);
+}
+
+.btn-tactical.active {
+    background: var(--primary);
+    color: var(--bg-dark);
+    font-weight: bold;
+    box-shadow: 0 0 12px var(--primary-glow);
+}
+
+.btn-tactical.danger {
+    border-color: var(--accent-red);
+    color: var(--accent-red);
+    background: rgba(255, 51, 68, 0.15);
+}
+
+.btn-tactical.danger:hover {
+    background: var(--accent-red);
+    color: #fff;
+    box-shadow: 0 0 12px var(--accent-red);
+}
+
+/* Main Display Layout */
+.main-workspace {
+    flex: 1;
+    display: flex;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Left Tactical Control Sidebar */
+.sidebar-controls {
+    width: 310px;
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border-color);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow-y: auto;
+    backdrop-filter: blur(10px);
+    z-index: 50;
+    transition: transform 0.3s ease;
+}
+
+.sidebar-controls.collapsed {
+    transform: translateX(-100%);
+    position: absolute;
+}
+
+.control-group {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.control-title {
+    font-size: 12px;
+    font-weight: bold;
+    color: var(--primary);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--primary-dim);
+    padding-bottom: 4px;
+}
+
+.source-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+/* SDR Controls */
+.sdr-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.slider-row {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.slider-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-dim);
+}
+
+input[type="range"] {
+    appearance: none;
+    -webkit-appearance: none;
+    background: var(--primary-dim);
+    height: 6px;
+    border-radius: 3px;
+    outline: none;
+    border: 1px solid var(--border-color);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 2px;
+    background: var(--primary);
+    cursor: pointer;
+    box-shadow: 0 0 6px var(--primary);
+}
+
+.form-select, .form-input {
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    font-family: var(--font-mono);
+    padding: 6px 8px;
+    font-size: 12px;
+    border-radius: 3px;
+    outline: none;
+}
+
+.form-select:focus, .form-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 8px var(--primary-glow);
+}
+
+/* Center Radar Screen PPI Canvas */
+.radar-center-container {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at center, #0c160f 0%, #050a06 80%, #000000 100%);
+    overflow: hidden;
+}
+
+#radarCanvas {
+    position: absolute;
+    cursor: crosshair;
+}
+
+/* Floating HUD Controls on Canvas */
+.canvas-hud-overlay {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+}
+
+.hud-badge {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    padding: 4px 10px;
+    font-size: 11px;
+    color: var(--primary);
+    border-radius: 2px;
+    pointer-events: auto;
+    backdrop-filter: blur(4px);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.canvas-controls-overlay {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    padding: 6px 12px;
+    border-radius: 20px;
+    backdrop-filter: blur(10px);
+    z-index: 40;
+}
+
+/* Right Flight Inspector / Target Lock Panel */
+.sidebar-inspector {
+    width: 350px;
+    background: var(--bg-panel);
+    border-left: 1px solid var(--border-color);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+    backdrop-filter: blur(10px);
+    z-index: 50;
+}
+
+.target-card-header {
+    background: var(--bg-card);
+    border: 1px solid var(--border-bright);
+    border-radius: 4px;
+    padding: 12px;
+    position: relative;
+    box-shadow: 0 0 14px var(--primary-dim);
+}
+
+.target-locked-tag {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: var(--primary);
+    color: var(--bg-dark);
+    font-size: 9px;
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 2px;
+    letter-spacing: 1px;
+}
+
+.target-locked-tag.emergency {
+    background: var(--accent-red);
+    color: #fff;
+    animation: emergencyBlink 0.8s infinite;
+}
+
+.target-callsign-lg {
+    font-size: 26px;
+    font-weight: bold;
+    color: var(--primary);
+    letter-spacing: 2px;
+    text-shadow: 0 0 10px var(--primary-glow);
+}
+
+.target-airline-sub {
+    font-size: 12px;
+    color: var(--text-color);
+    margin-top: 2px;
+    font-weight: bold;
+}
+
+.target-icao-sub {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 2px;
+}
+
+.target-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.target-cell {
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--border-color);
+    padding: 6px 8px;
+    border-radius: 2px;
+}
+
+.target-cell.span-full {
+    grid-column: span 2;
+}
+
+.target-cell-label {
+    font-size: 9px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.target-cell-val {
+    font-size: 13px;
+    font-weight: bold;
+    color: var(--text-color);
+    margin-top: 2px;
+}
+
+.target-cell-sub {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 2px;
+}
+
+/* Signal Strength Bar Meter */
+.signal-meter-bar {
+    width: 100%;
+    height: 6px;
+    background: rgba(0, 0, 0, 0.6);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 4px;
+    border: 1px solid var(--border-color);
+}
+
+.signal-meter-fill {
+    height: 100%;
+    background: var(--primary);
+    box-shadow: 0 0 8px var(--primary);
+    transition: width 0.3s ease;
+}
+
+/* Flight Tracker Action Buttons */
+.flight-links-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.btn-flight-link {
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--border-color);
+    color: var(--primary);
+    padding: 5px 8px;
+    font-size: 10px;
+    text-decoration: none;
+    text-align: center;
+    border-radius: 3px;
+    display: inline-block;
+    transition: all 0.15s ease;
+}
+
+.btn-flight-link:hover {
+    background: var(--primary);
+    color: var(--bg-dark);
+    font-weight: bold;
+    box-shadow: 0 0 8px var(--primary-glow);
+}
+
+/* Contacts List Bottom Drawer */
+.contacts-drawer {
+    background: var(--bg-panel);
+    border-top: 1px solid var(--border-color);
+    height: 160px;
+    display: flex;
+
+    flex-direction: column;
+    backdrop-filter: blur(10px);
+    z-index: 60;
+    transition: height 0.3s ease;
+}
+
+.contacts-drawer.collapsed {
+    height: 28px;
+}
+
+.drawer-header {
+    height: 28px;
+    padding: 0 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.drawer-title {
+    font-size: 11px;
+    font-weight: bold;
+    color: var(--primary);
+    letter-spacing: 1px;
+}
+
+.table-wrapper {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.contacts-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.contacts-table th {
+    background: rgba(0, 0, 0, 0.5);
+    color: var(--text-dim);
+    font-size: 10px;
+    padding: 6px 8px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
+}
+
+.contacts-table td {
+    padding: 5px 8px;
+    border-bottom: 1px solid rgba(0, 255, 102, 0.1);
+    color: var(--text-color);
+}
+
+.contacts-table tr:hover {
+    background: var(--primary-dim);
+    cursor: pointer;
+}
+
+.contacts-table tr.selected {
+    background: rgba(0, 255, 102, 0.25);
+    font-weight: bold;
+}
+
+.contacts-table tr.emergency-row {
+    background: rgba(255, 51, 68, 0.2);
+    color: var(--accent-red);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.4);
+}
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--primary);
+}
