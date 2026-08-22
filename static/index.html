@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-World Multi-SDR Aircraft Radar (Swansea SA1 8LY - 50-Mile Scope)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/radar.css">
+</head>
+<body>
+    <div class="crt-overlay"></div>
+
+    <!-- Top Telemetry & Command Bar -->
+    <header class="top-header">
+        <div class="logo-section">
+            <div class="radar-icon-pulse"></div>
+            <div>
+                <div class="app-title">AERO-SDR RADAR™</div>
+                <div class="app-subtitle">TACTICAL AIRSPACE SURVEILLANCE & SDR INTERCEPTOR • 50-MILE SCOPE</div>
+            </div>
+        </div>
+
+        <div class="telemetry-strip">
+            <div class="telemetry-item">
+                <span class="telemetry-label">Station Base</span>
+                <span class="telemetry-value" id="stationNameVal">Swansea Base (SA1 8LY)</span>
+            </div>
+            <div class="telemetry-item">
+                <span class="telemetry-label">GPS Center</span>
+                <span class="telemetry-value" id="stationCoordsVal">51.62°, -3.94°</span>
+            </div>
+            <div class="telemetry-item">
+                <span class="telemetry-label">Scope Range</span>
+                <span class="telemetry-value highlight" id="rangeIndicatorVal">50 MILES</span>
+            </div>
+            <div class="telemetry-item">
+                <span class="telemetry-label">Air Targets</span>
+                <span class="telemetry-value" id="inRangeContactsVal">0</span>
+            </div>
+            <div class="telemetry-item">
+                <span class="telemetry-label">Active Radio / Feed</span>
+                <span class="telemetry-value" id="activeRadioVal" style="color: var(--accent-cyan);">HackRF One</span>
+            </div>
+            <div class="telemetry-item">
+                <span class="telemetry-label">Emergencies</span>
+                <span class="telemetry-value" id="emergencyCountVal">0</span>
+            </div>
+            <div class="telemetry-item">
+                <span class="telemetry-label">Packet Rate</span>
+                <span class="telemetry-value" id="packetRateVal">0 FPS</span>
+            </div>
+        </div>
+
+        <div class="header-actions">
+            <button class="btn-tactical" id="audioToggleBtn">🔊 AUDIO ON</button>
+            <select class="form-select" id="themeSelect">
+                <option value="green">🟢 Phosphor Green</option>
+                <option value="amber">🟠 Amber CRT</option>
+                <option value="cyan">🔵 Tactical Cyan</option>
+                <option value="red">🔴 Night Ops Red</option>
+            </select>
+            <div class="hud-badge" id="wsStatusBadge">CONNECTING...</div>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="main-workspace">
+        
+        <!-- Left Tactical Control Sidebar -->
+        <aside class="sidebar-controls" id="sidebarControls">
+            
+            <!-- SDR Hardware Radio Selector & Controls -->
+            <div class="control-group sdr-panel">
+                <div class="control-title">
+                    <span>📻 SDR Radio & Signal Source</span>
+                    <div style="display: flex; gap: 4px;">
+                        <button class="btn-tactical" id="diagSdrBtn" style="padding: 2px 6px; font-size: 10px;">🩺 Health Test</button>
+                        <button class="btn-tactical" id="scanSdrDevicesBtn" style="padding: 2px 6px; font-size: 10px;">Scan USB</button>
+                    </div>
+                </div>
+
+                <div>
+                    <label style="font-size: 10px; color: var(--text-dim);">SELECT RECEIVING HARDWARE / DATA MODE</label>
+                    <select class="form-select" id="sdrSourceSelect" style="width: 100%; margin-top: 2px;">
+                        <option value="hackrf" selected>📻 HackRF One (8 MSPS High-Precision)</option>
+                        <option value="rtlsdr">📻 RTL-SDR (RTL2832U / v3 / v4 / Pro Stick)</option>
+                        <option value="bladerf">📻 BladeRF (x40 / x115 / Micro)</option>
+                        <option value="airspy">📻 Airspy (R2 / Mini)</option>
+                        <option value="network">🌐 Network Feed (dump1090 / readsb / Beast)</option>
+                        <option value="live_feed">🛰️ Real-World Live Airspace (100% Real Physical Aircraft)</option>
+                        <option value="dummy_sim">🎮 Tactical Flight Simulator (Dynamic Dummy Airspace)</option>
+                    </select>
+                </div>
+                
+                <div style="font-size: 11px; padding: 6px 8px; background: rgba(0,0,0,0.5); border: 1px solid var(--border-color); border-radius: 3px;" id="sdrDeviceStatusText">
+                    Scanning connected SDR devices...
+                </div>
+
+                <!-- Dynamic Controls for HackRF -->
+                <div id="hackrfControlsGroup" class="sdr-device-controls">
+                    <div style="margin-bottom: 8px; padding: 6px 8px; background: rgba(0, 255, 157, 0.06); border: 1px solid var(--border-color); border-radius: 4px; font-size: 10px; line-height: 1.4;">
+                        <strong style="color: var(--primary);">🛡️ HACKRF FRONT-END PROTECTION:</strong>
+                        <div style="color: var(--text-dim); margin-top: 2px;">• Max RF Input: <span style="color: var(--accent-red);">-5 dBm (0.3V RMS)</span>. Never transmit nearby!</div>
+                        <div style="color: var(--text-dim);">• Recommended: 1090MHz SAW Bandpass filter to avoid out-of-band ADC overload.</div>
+                    </div>
+
+                    <div class="slider-row">
+                        <div class="slider-labels">
+                            <span>LNA Gain (RF Front)</span>
+                            <span id="lnaVal">32 dB</span>
+                        </div>
+                        <input type="range" id="hackrfLnaSlider" min="0" max="40" step="8" value="32" oninput="document.getElementById('lnaVal').innerText = this.value + ' dB'">
+                    </div>
+
+                    <div class="slider-row">
+                        <div class="slider-labels">
+                            <span>VGA Gain (Baseband)</span>
+                            <span id="vgaVal">28 dB</span>
+                        </div>
+                        <input type="range" id="hackrfVgaSlider" min="0" max="62" step="2" value="28" oninput="document.getElementById('vgaVal').innerText = this.value + ' dB'">
+                    </div>
+
+                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; margin-top: 4px;">
+                        <span>14 dB RF Pre-Amp (Antenna)</span>
+                        <input type="checkbox" id="hackrfAmpToggle">
+                    </div>
+
+                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; margin-top: 4px;">
+                        <span>Bias-Tee 3.3V <span style="color: var(--accent-red); font-size: 9px;">(⚠️ LNA ONLY)</span></span>
+                        <input type="checkbox" id="hackrfBiasTeeToggle">
+                    </div>
+
+                    <div class="slider-row" style="margin-top: 6px;">
+                        <div class="slider-labels">
+                            <span>Sample Rate</span>
+                        </div>
+                        <select class="form-select" id="hackrfSampleRateSelect">
+                            <option value="8000000" selected>⚡ 8 MSPS (High Precision Pulse Slicing)</option>
+                            <option value="2000000">⏱ 2 MSPS (Standard Rate)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Dynamic Controls for RTL-SDR -->
+                <div id="rtlsdrControlsGroup" class="sdr-device-controls" style="display: none;">
+                    <div class="slider-row">
+                        <div class="slider-labels">
+                            <span>Tuner Gain</span>
+                            <span id="rtlGainVal">49.6 dB</span>
+                        </div>
+                        <input type="range" id="rtlGainSlider" min="0" max="49.6" step="1" value="49.6" oninput="document.getElementById('rtlGainVal').innerText = this.value + ' dB'">
+                    </div>
+
+                    <div class="slider-row">
+                        <div class="slider-labels">
+                            <span>Frequency PPM Correction</span>
+                            <span id="rtlPpmVal">0 PPM</span>
+                        </div>
+                        <input type="range" id="rtlPpmSlider" min="-50" max="50" step="1" value="0" oninput="document.getElementById('rtlPpmVal').innerText = this.value + ' PPM'">
+                    </div>
+
+                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; margin-top: 2px;">
+                        <span>Bias-Tee (4.5V for Active Antennas)</span>
+                        <input type="checkbox" id="rtlBiasTeeToggle">
+                    </div>
+                </div>
+
+                <!-- Dynamic Controls for BladeRF -->
+                <div id="bladerfControlsGroup" class="sdr-device-controls" style="display: none;">
+                    <div class="slider-row">
+                        <div class="slider-labels">
+                            <span>RX Gain</span>
+                            <span id="bladeGainVal">40 dB</span>
+                        </div>
+                        <input type="range" id="bladeGainSlider" min="0" max="60" step="2" value="40" oninput="document.getElementById('bladeGainVal').innerText = this.value + ' dB'">
+                    </div>
+                </div>
+
+                <!-- Dynamic Controls for Airspy -->
+                <div id="airspyControlsGroup" class="sdr-device-controls" style="display: none;">
+                    <div class="slider-row">
+                        <div class="slider-labels">
+                            <span>Airspy Gain</span>
+                            <span id="airspyGainVal">18</span>
+                        </div>
+                        <input type="range" id="airspyGainSlider" min="0" max="21" step="1" value="18" oninput="document.getElementById('airspyGainVal').innerText = this.value">
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; margin-top: 2px;">
+                        <span>Airspy Bias-Tee (4.5V)</span>
+                        <input type="checkbox" id="airspyBiasTeeToggle">
+                    </div>
+                </div>
+
+                <!-- Dynamic Controls for Network Feed -->
+                <div id="networkControlsGroup" class="sdr-device-controls" style="display: none;">
+                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 6px;">
+                        <div>
+                            <label style="font-size: 9px; color: var(--text-dim);">IP HOST</label>
+                            <input type="text" class="form-input" id="netHostInput" value="127.0.0.1" style="width: 100%;">
+                        </div>
+                        <div>
+                            <label style="font-size: 9px; color: var(--text-dim);">PORT</label>
+                            <input type="number" class="form-input" id="netPortInput" value="30002" style="width: 100%;">
+                        </div>
+                    </div>
+                    <div style="margin-top: 4px;">
+                        <label style="font-size: 9px; color: var(--text-dim);">STREAM PROTOCOL</label>
+                        <select class="form-select" id="netModeSelect" style="width: 100%;">
+                            <option value="raw" selected>Raw Mode-S (Port 30002 AVR)</option>
+                            <option value="sbs">SBS-1 BaseStation (Port 30003)</option>
+                            <option value="json">dump1090 HTTP JSON URL</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Dynamic Controls for Real-World Live Airspace Feed -->
+                <div id="liveFeedControlsGroup" class="sdr-device-controls" style="display: none;">
+                    <div style="font-size: 10px; color: var(--text-dim); line-height: 1.4;">
+                        Streams 100% REAL physical flights around your station coordinates from public Mode-S transponder decoders.
+                    </div>
+                </div>
+
+                <!-- Dynamic Controls for Dummy Flight Simulator -->
+                <div id="dummySimControlsGroup" class="sdr-device-controls" style="display: none;">
+                    <div style="font-size: 10px; color: var(--text-dim); line-height: 1.4;">
+                        Generates dynamic simulated aircraft over Swansea & South Wales: British Airways A350, RAF Typhoon fighter, HM Coastguard SAR Helicopter, Cessna 172, and Squawk 7700 emergency drill.
+                    </div>
+                </div>
+
+
+                <div style="display: flex; gap: 6px; margin-top: 6px;">
+                    <button class="btn-tactical" id="startSdrBtn" style="flex: 1; justify-content: center; background: var(--primary); color: var(--bg-dark); font-weight: bold;">▶ Apply & Start</button>
+                    <button class="btn-tactical danger" id="stopSdrBtn" style="flex: 1; justify-content: center;">⏹ Stop</button>
+                </div>
+
+                <div style="font-size: 10px; color: var(--text-dim);" id="sdrLiveStatsText">
+                    Listening on 1090 MHz (Real-World RF only)
+                </div>
+            </div>
+
+            <!-- Radar Display Layers & Map Overlays -->
+            <div class="control-group">
+                <div class="control-title">
+                    <span>🗺️ Map Overlays & Layers</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 6px; font-size: 11px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="toggleAirspaceCheck" checked>
+                        <span>Airfields & Nav Waypoints (EGFH, EGFF, BCN)</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="toggleCoverageCheck" checked>
+                        <span>Antenna Polar Max Range Heatmap</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="toggleTrailsCheck" checked>
+                        <span>Target Phosphor History Trails</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="toggleVectorsCheck" checked>
+                        <span>1-Min Predictive Velocity Vectors</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="toggleTagsCheck" checked>
+                        <span>Target Callsign & Altitude Labels</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Station GPS Calibration -->
+            <div class="control-group">
+                <div class="control-title">
+                    <span>📍 Radar Station Center</span>
+                </div>
+                
+                <button class="btn-tactical" id="btnUseBrowserGps" style="justify-content: center;">
+                    🎯 Set to My Exact GPS Location
+                </button>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px;">
+                    <div>
+                        <label style="font-size: 9px; color: var(--text-dim);">LATITUDE</label>
+                        <input type="number" step="0.0001" class="form-input" id="stationLatInput" value="51.6214" style="width: 100%;">
+                    </div>
+                    <div>
+                        <label style="font-size: 9px; color: var(--text-dim);">LONGITUDE</label>
+                        <input type="number" step="0.0001" class="form-input" id="stationLonInput" value="-3.9436" style="width: 100%;">
+                    </div>
+                </div>
+
+                <div>
+                    <label style="font-size: 9px; color: var(--text-dim);">STATION NAME</label>
+                    <input type="text" class="form-input" id="stationNameInput" value="Swansea Base (SA1 8LY)" style="width: 100%;">
+                </div>
+
+                <button class="btn-tactical" id="btnSaveStationCoords" style="justify-content: center;">Save Station Location</button>
+            </div>
+
+            <!-- Radar Sweep Speed RPM -->
+            <div class="control-group">
+                <div class="control-title">
+                    <span>🔄 Radar Sweep Speed</span>
+                    <span id="sweepRpmVal" style="color: var(--primary); font-size: 11px;">15 RPM</span>
+                </div>
+                <input type="range" id="sweepRpmSlider" min="0" max="60" step="1" value="15">
+            </div>
+
+            <!-- Filters -->
+            <div class="control-group">
+                <div class="control-title">
+                    <span>🔍 Real Aircraft Filter</span>
+                </div>
+                <input type="text" class="form-input" id="searchContactInput" placeholder="Filter Callsign / ICAO...">
+                
+                <div class="slider-row" style="margin-top: 6px;">
+                    <div class="slider-labels">
+                        <span>Min Altitude</span>
+                        <span id="altFilterVal">0 FT</span>
+                    </div>
+                    <input type="range" id="altFilterSlider" min="0" max="40000" step="1000" value="0">
+                </div>
+
+                <div style="margin-top: 4px;">
+                    <label style="font-size: 9px; color: var(--text-dim);">AIRCRAFT CATEGORY</label>
+                    <select class="form-select" id="aircraftTypeFilterSelect" style="width: 100%;">
+                        <option value="ALL" selected>All Real Aircraft</option>
+                        <option value="Commercial">Commercial Airliners</option>
+                        <option value="Military">Military Aircraft</option>
+                        <option value="Light">Light GA / Trainers</option>
+                        <option value="Helicopter">Helicopters / SAR</option>
+                        <option value="Emergency">🚨 Active Emergencies Only</option>
+                    </select>
+                </div>
+            </div>
+
+        </aside>
+
+        <!-- Center Radar Screen PPI Canvas -->
+        <main class="radar-center-container">
+            <canvas id="radarCanvas"></canvas>
+
+            <!-- Floating Scope Radius Controls (Default 50 Miles) -->
+            <div class="canvas-controls-overlay">
+                <button class="btn-tactical range-btn" data-range="15">15 MI</button>
+                <button class="btn-tactical range-btn" data-range="25">25 MI</button>
+                <button class="btn-tactical range-btn active" data-range="50">50 MI</button>
+                <button class="btn-tactical range-btn" data-range="75">75 MI</button>
+                <button class="btn-tactical range-btn" data-range="100">100 MI</button>
+                <button class="btn-tactical range-btn" data-range="150">150 MI</button>
+            </div>
+        </main>
+
+        <!-- Right Flight Inspector Panel -->
+        <aside class="sidebar-inspector">
+            <div class="control-title" style="margin-bottom: 4px;">
+                <span>🎯 Aircraft Data Inspector</span>
+                <span id="targetLockStatusIndicator" style="font-size: 9px; color: var(--text-dim);">CLICK TARGET</span>
+            </div>
+            <div id="targetInspectorContent">
+                <!-- Populated dynamically by app.js with full SDR aircraft telemetry -->
+            </div>
+        </aside>
+
+    </div>
+
+    <!-- Bottom Contacts List Drawer -->
+    <footer class="contacts-drawer" id="contactsDrawer">
+        <div class="drawer-header" onclick="document.getElementById('contactsDrawer').classList.toggle('collapsed')">
+            <span class="drawer-title">📋 REAL-WORLD AIRCRAFT CONTACTS (SDR 1090 MHz LIVE)</span>
+            <span style="font-size: 11px; color: var(--text-dim);">▲ TOGGLE LIST</span>
+        </div>
+        <div class="table-wrapper">
+            <table class="contacts-table">
+                <thead>
+                    <tr>
+                        <th>CALLSIGN</th>
+                        <th>ICAO</th>
+                        <th>FLAG</th>
+                        <th>AIRLINE / OPERATOR</th>
+                        <th>TYPE</th>
+                        <th>ALTITUDE</th>
+                        <th>SPEED</th>
+                        <th>HEADING</th>
+                        <th>DISTANCE</th>
+                        <th>BEARING</th>
+                        <th>SQUAWK</th>
+                        <th>SIGNAL</th>
+                        <th>RECEIVER</th>
+                    </tr>
+                </thead>
+                <tbody id="contactsTableBody">
+                    <!-- Populated dynamically -->
+                </tbody>
+            </table>
+        </div>
+    </footer>
+
+    <!-- SDR Health Diagnostics & Front-End Protection Modal -->
+    <div id="diagModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 9999; justify-content: center; align-items: center; padding: 20px;">
+        <div style="background: var(--bg-card); border: 1px solid var(--primary); border-radius: 6px; max-width: 650px; width: 100%; max-height: 85vh; overflow-y: auto; padding: 20px; box-shadow: 0 0 30px rgba(0,255,157,0.2);">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 14px;">
+                <h2 style="font-size: 16px; color: var(--primary); margin: 0;">🩺 SDR HARDWARE DIAGNOSTICS & RF PROTECTION</h2>
+                <button class="btn-tactical" id="closeDiagModalBtn" style="padding: 2px 8px;">✕ CLOSE</button>
+            </div>
+            <div id="diagModalContent" style="font-size: 12px; line-height: 1.5; color: var(--text-color);">
+                Running live hardware diagnostics...
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/static/js/radar_audio.js"></script>
+    <script src="/static/js/radar_canvas.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
+
