@@ -35,6 +35,7 @@ class RadarApp {
         const sdrSelect = document.getElementById('sdrSourceSelect');
         if (sdrSelect) {
             sdrSelect.addEventListener('change', (e) => {
+                this.userSelectedSource = true;
                 this.onSdrSourceChanged(e.target.value);
             });
         }
@@ -81,15 +82,34 @@ class RadarApp {
             saveCoordsBtn.addEventListener('click', () => this.saveStationCoords());
         }
 
-        // Audio Toggle
+        // Audio Toggle & Sample Ping
         const audioBtn = document.getElementById('audioToggleBtn');
         if (audioBtn) {
             audioBtn.addEventListener('click', () => {
                 const state = window.radarAudio.toggle();
                 audioBtn.classList.toggle('active', state);
-                audioBtn.innerText = state ? '🔊 AUDIO ON' : '🔇 AUDIO OFF';
+                audioBtn.innerText = state ? '🔊 RADAR PING: ON' : '🔇 RADAR PING: OFF';
             });
         }
+
+        const testPingBtn = document.getElementById('testPingBtn');
+        if (testPingBtn) {
+            testPingBtn.addEventListener('click', () => {
+                if (window.radarAudio) {
+                    window.radarAudio.init();
+                    window.radarAudio.playRadarSweepPing();
+                }
+            });
+        }
+
+        // Unlock Web Audio API on first user interaction anywhere
+        const unlockAudio = () => {
+            if (window.radarAudio) window.radarAudio.init();
+            document.removeEventListener('click', unlockAudio);
+            document.removeEventListener('keydown', unlockAudio);
+        };
+        document.addEventListener('click', unlockAudio, { once: true });
+        document.addEventListener('keydown', unlockAudio, { once: true });
 
         // Theme Selector
         const themeSelect = document.getElementById('themeSelect');
@@ -475,6 +495,11 @@ class RadarApp {
 
         if (data.source) {
             this.activeSource = data.source.active || 'hackrf';
+            const sdrSelect = document.getElementById('sdrSourceSelect');
+            if (sdrSelect && !this.userSelectedSource && sdrSelect.value !== this.activeSource) {
+                sdrSelect.value = this.activeSource;
+                this.onSdrSourceChanged(this.activeSource);
+            }
             document.getElementById('activeRadioVal').innerText = (data.source.stats && data.source.stats.device) ? data.source.stats.device : this.activeSource.toUpperCase();
             
             if (data.source.stats) {
@@ -522,7 +547,7 @@ class RadarApp {
                     <div style="font-size: 36px; margin-bottom: 8px;">📡</div>
                     <div style="font-size: 13px; font-weight: bold; letter-spacing: 1.5px; color: var(--primary);">NO AIRCRAFT LOCKED</div>
                     <div style="font-size: 11px; margin-top: 6px; line-height: 1.4;">
-                        Click any real aircraft contact on the radar scope or in the table below to inspect live SDR telemetry, altitude, speed, squawk, and flight coordinates.
+                        Click any real aircraft contact on the radar scope or in the table below to inspect live SDR telemetry, heading, speed, squawk, and flight coordinates.
                     </div>
                 </div>
             `;
@@ -531,6 +556,22 @@ class RadarApp {
 
         const ac = this.aircraftMap.get(this.selectedIcao);
         
+        // Cardinal direction helper
+        const getCardinal = (deg) => {
+            if (deg === null || deg === undefined) return '';
+            const val = Math.floor((deg / 22.5) + 0.5);
+            const arr = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+            return arr[(val % 16)];
+        };
+
+        const hdgDeg = ac.heading !== null ? Math.round(ac.heading) : null;
+        const hdgCard = hdgDeg !== null ? getCardinal(hdgDeg) : '';
+        const hdgStr = hdgDeg !== null ? `${hdgDeg.toString().padStart(3, '0')}° ${hdgCard}` : '---';
+
+        const brgDeg = ac.bearing_deg !== null ? Math.round(ac.bearing_deg) : null;
+        const brgCard = brgDeg !== null ? getCardinal(brgDeg) : '';
+        const brgStr = brgDeg !== null ? `${brgDeg.toString().padStart(3, '0')}° ${brgCard}` : '---';
+
         // Formatted strings
         const altFtStr = ac.alt ? `${ac.alt.toLocaleString()} FT` : '---';
         const flStr = ac.flight_level ? `(${ac.flight_level})` : '';
@@ -541,12 +582,34 @@ class RadarApp {
         const spdKmhStr = ac.speed_kmh ? `${ac.speed_kmh} KM/H` : '';
         const machStr = ac.mach ? `M${ac.mach}` : '';
         
-        const hdgStr = ac.heading !== null ? `${ac.heading.toString().padStart(3, '0')}°` : '---';
         const distStr = ac.distance_nm ? `${ac.distance_nm.toFixed(1)} NM (${ac.distance_mi} mi / ${ac.distance_km} km)` : '---';
-        const brgStr = ac.bearing_deg !== null ? `${ac.bearing_deg.toFixed(0).padStart(3, '0')}°` : '---';
         
         const sigFillPct = Math.max(5, Math.min(100, ac.signal_quality || 50));
         const sigColor = (sigFillPct > 70) ? 'var(--primary)' : (sigFillPct > 40 ? 'var(--accent-amber)' : 'var(--accent-red)');
+
+        // Dynamic SVG Compass Rose Dial
+        const compassSvg = hdgDeg !== null ? `
+            <svg class="target-compass-svg" width="68" height="68" viewBox="0 0 68 68" style="overflow: visible;">
+                <circle cx="34" cy="34" r="30" fill="rgba(0,0,0,0.55)" stroke="var(--border-color)" stroke-width="1.5" />
+                <circle cx="34" cy="34" r="22" fill="none" stroke="var(--primary-dim)" stroke-width="1" stroke-dasharray="2,3" />
+                <!-- Cardinal Labels -->
+                <text x="34" y="11" fill="var(--primary)" font-size="8" text-anchor="middle" font-weight="bold">N</text>
+                <text x="61" y="37" fill="var(--text-dim)" font-size="7" text-anchor="middle">E</text>
+                <text x="34" y="62" fill="var(--text-dim)" font-size="7" text-anchor="middle">S</text>
+                <text x="7" y="37" fill="var(--text-dim)" font-size="7" text-anchor="middle">W</text>
+                <!-- Rotating Pointer Arrow -->
+                <g transform="rotate(${hdgDeg} 34 34)">
+                    <polygon points="34,13 38.5,34 34,30 29.5,34" fill="var(--primary)" filter="drop-shadow(0 0 4px var(--primary))" />
+                    <polygon points="34,51 36,34 34,36 32,34" fill="rgba(255,255,255,0.4)" />
+                    <circle cx="34" cy="34" r="2.5" fill="var(--bg-dark)" stroke="var(--primary)" stroke-width="1.2" />
+                </g>
+            </svg>
+        ` : `
+            <svg class="target-compass-svg" width="68" height="68" viewBox="0 0 68 68">
+                <circle cx="34" cy="34" r="30" fill="rgba(0,0,0,0.4)" stroke="var(--border-color)" stroke-width="1" />
+                <text x="34" y="38" fill="var(--text-dim)" font-size="10" text-anchor="middle">N/A</text>
+            </svg>
+        `;
 
         // Flight Tracker External Lookup URLs
         const cleanCallsign = ac.callsign && ac.callsign !== '---' ? encodeURIComponent(ac.callsign) : '';
@@ -561,6 +624,17 @@ class RadarApp {
                 <div class="target-callsign-lg">${ac.country_flag || '✈️'} ${ac.callsign}</div>
                 <div class="target-airline-sub">${ac.airline}</div>
                 <div class="target-icao-sub">ICAO: 0x${ac.icao} • ${ac.country} (${ac.type})</div>
+            </div>
+
+            <!-- Tactical Heading & Speed Compass Card -->
+            <div class="target-compass-row">
+                ${compassSvg}
+                <div class="target-compass-info">
+                    <div style="font-size: 9px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px;">Flight Heading & Speed</div>
+                    <div class="target-compass-hdg">HDG ${hdgStr}</div>
+                    <div class="target-compass-spd">SPD ${spdKtsStr} <span style="font-size: 11px; font-weight: normal; color: var(--text-dim);">(${spdMphStr})</span></div>
+                    <div class="target-compass-sub">${spdKmhStr} ${machStr ? '• ' + machStr : ''}</div>
+                </div>
             </div>
 
             <div class="target-grid">
@@ -579,11 +653,11 @@ class RadarApp {
                     </div>
                 </div>
 
-                <!-- Speed & Mach -->
+                <!-- Ground Speed -->
                 <div class="target-cell">
                     <div class="target-cell-label">Ground Speed</div>
                     <div class="target-cell-val">${spdKtsStr}</div>
-                    <div class="target-cell-sub">${spdMphStr} • ${machStr}</div>
+                    <div class="target-cell-sub">${spdMphStr}</div>
                 </div>
 
                 <!-- Track / Heading -->
@@ -593,14 +667,14 @@ class RadarApp {
                     <div class="target-cell-sub">Heading vector</div>
                 </div>
 
-                <!-- Distance from Station -->
+                <!-- Distance & Bearing from Radar Station -->
                 <div class="target-cell span-full">
                     <div class="target-cell-label">Distance & Bearing to Radar</div>
                     <div class="target-cell-val">${distStr}</div>
                     <div class="target-cell-sub">Azimuth: ${brgStr} relative to Swansea Base</div>
                 </div>
 
-                <!-- Squawk Code -->
+                <!-- Transponder Squawk Code -->
                 <div class="target-cell span-full">
                     <div class="target-cell-label">Transponder Squawk Code</div>
                     <div class="target-cell-val" style="color: ${ac.is_emergency ? 'var(--accent-red)' : 'var(--primary)'}">
@@ -609,7 +683,7 @@ class RadarApp {
                     <div class="target-cell-sub" style="color: ${ac.is_emergency ? 'var(--accent-red)' : 'var(--text-color)'}">${ac.squawk_desc}</div>
                 </div>
 
-                <!-- RF Radio Signal -->
+                <!-- RF Radio Signal Quality -->
                 <div class="target-cell span-full">
                     <div class="target-cell-label">SDR Radio Signal Quality</div>
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
@@ -621,14 +695,14 @@ class RadarApp {
                     </div>
                 </div>
 
-                <!-- GPS Coordinates -->
+                <!-- Exact GPS Coordinates -->
                 <div class="target-cell span-full">
                     <div class="target-cell-label">Exact Geolocation</div>
                     <div class="target-cell-val" style="font-size: 11px;">${ac.lat !== null ? `${ac.lat.toFixed(5)}°, ${ac.lon.toFixed(5)}°` : '---'}</div>
                     <div class="target-cell-sub">${ac.dms}</div>
                 </div>
 
-                <!-- Downlink Format & Last Seen -->
+                <!-- Downlink Protocol & Age -->
                 <div class="target-cell span-full">
                     <div class="target-cell-label">Mode-S Frame Protocol</div>
                     <div class="target-cell-sub" style="color: var(--text-color);">${ac.downlink_format}</div>
