@@ -30,13 +30,46 @@ class RTLSDRReceiver:
         self.status_message = "Idle"
         self._reader_thread: Optional[threading.Thread] = None
 
-    @staticmethod
-    def is_rtlsdr_available() -> Dict[str, Any]:
+    @classmethod
+    def get_rtl_sdr_binary(cls) -> Optional[str]:
+        """Finds system or compiled local rtl_sdr binary."""
+        local_bin = os.path.join(os.path.dirname(__file__), "rtl_sdr")
+        src_file = os.path.join(os.path.dirname(__file__), "rtl_sdr.c")
+
+        if os.path.isfile(local_bin) and os.access(local_bin, os.X_OK):
+            return local_bin
+
+        if os.path.isfile(src_file):
+            try:
+                subprocess.run(["gcc", "-O3", src_file, "-o", local_bin, "-ldl"], check=True, timeout=10)
+                if os.path.isfile(local_bin) and os.access(local_bin, os.X_OK):
+                    return local_bin
+            except Exception:
+                pass
+
+        return shutil.which("rtl_sdr")
+
+    @classmethod
+    def is_rtlsdr_available(cls) -> Dict[str, Any]:
         """Detects whether RTL-SDR hardware or binaries are present."""
-        rtl_sdr_path = shutil.which("rtl_sdr")
-        rtl_test_path = shutil.which("rtl_test")
-        
-        # Check lsusb for RTL2832U / Realtek RTL chips
+        rtl_sdr_path = cls.get_rtl_sdr_binary()
+
+        # 1. Test hardware directly via rtl_sdr -t if binary exists
+        if rtl_sdr_path:
+            try:
+                res = subprocess.run([rtl_sdr_path, "-t"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=3)
+                out = res.stdout + res.stderr
+                if "ready:" in out or "RTL-SDR device #" in out or "Found Rafael" in out:
+                    detail = "RTL-SDR USB dongle connected & ready"
+                    for line in out.splitlines():
+                        if "ready:" in line:
+                            detail = line.strip()
+                            break
+                    return {"available": True, "device_found": True, "detail": detail, "binary": rtl_sdr_path}
+            except Exception:
+                pass
+
+        # 2. Check lsusb for RTL-SDR dongle signatures (specifically excluding card readers)
         has_usb_device = False
         usb_details = ""
         lsusb_path = shutil.which("lsusb")
@@ -44,19 +77,13 @@ class RTLSDRReceiver:
             try:
                 res = subprocess.run([lsusb_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=2)
                 for line in res.stdout.splitlines():
-                    if any(k in line.lower() for k in ("rtl2832", "rtl2838", "realtek", "dvb-t", "flightaware")):
+                    lower = line.lower()
+                    if "card reader" in lower or "rts5129" in lower:
+                        continue
+                    if any(k in lower for k in ("0bda:2838", "0bda:2832", "rtl2832", "rtl2838", "dvb-t", "flightaware")):
                         has_usb_device = True
                         usb_details = line.strip()
                         break
-            except Exception:
-                pass
-
-        if rtl_test_path:
-            try:
-                res = subprocess.run([rtl_test_path, "-t"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=3)
-                out = res.stdout + res.stderr
-                if "Found " in out and ("RTL" in out or "device" in out):
-                    return {"available": True, "device_found": True, "detail": "RTL-SDR dongle connected", "binary": rtl_sdr_path}
             except Exception:
                 pass
 
@@ -64,12 +91,12 @@ class RTLSDRReceiver:
             if rtl_sdr_path:
                 return {"available": True, "device_found": True, "detail": f"RTL-SDR USB connected: {usb_details}", "binary": rtl_sdr_path}
             else:
-                return {"available": False, "device_found": True, "detail": f"RTL-SDR USB plugged in ({usb_details}). Run 'sudo apt install rtl-sdr' to activate driver"}
-            
+                return {"available": False, "device_found": True, "detail": f"RTL-SDR USB plugged in ({usb_details}). Drivers missing."}
+
         return {
             "available": bool(rtl_sdr_path),
             "device_found": False,
-            "detail": "rtl_sdr tool ready (no RTL-SDR USB dongle detected)" if rtl_sdr_path else "RTL-SDR tool not installed (sudo apt install rtl-sdr)"
+            "detail": "rtl_sdr tool ready (no RTL-SDR USB dongle detected)" if rtl_sdr_path else "RTL-SDR tool not found"
         }
 
     def start(self, gain: Optional[float] = 49.6, ppm: int = 0, bias_tee: int = 0, sample_rate: int = 2000000) -> bool:
@@ -82,11 +109,18 @@ class RTLSDRReceiver:
         self.bias_tee = bias_tee
         self.sample_rate = sample_rate
 
-        rtl_sdr = shutil.which("rtl_sdr")
+        rtl_sdr = self.get_rtl_sdr_binary()
         demod_bin = os.path.join(os.path.dirname(__file__), "adsb_demod")
+        demod_src = os.path.join(os.path.dirname(__file__), "adsb_demod.c")
+
+        if not os.path.exists(demod_bin) and os.path.exists(demod_src):
+            try:
+                subprocess.run(["gcc", "-O3", demod_src, "-o", demod_bin, "-lm"], check=True, timeout=10)
+            except Exception:
+                pass
 
         if not rtl_sdr:
-            self.status_message = "Error: rtl_sdr tool not found (run: sudo apt install rtl-sdr)"
+            self.status_message = "Error: rtl_sdr tool not found"
             logger.error(self.status_message)
             return False
 
@@ -94,9 +128,6 @@ class RTLSDRReceiver:
             self.status_message = "Error: sdr/adsb_demod binary missing"
             logger.error(self.status_message)
             return False
-
-        subprocess.run(["pkill", "-f", "rtl_sdr"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
-        time.sleep(0.2)
 
         gain_arg = "auto" if self.gain == -1 or str(self.gain).lower() == "auto" else str(self.gain)
 
@@ -106,6 +137,7 @@ class RTLSDRReceiver:
             "-s", str(self.sample_rate),
             "-g", str(gain_arg),
             "-p", str(self.ppm),
+            "-a", "1",
             "-"
         ]
 
@@ -124,7 +156,7 @@ class RTLSDRReceiver:
             self.process = subprocess.Popen(
                 rtl_cmd,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
                 bufsize=131072,
                 preexec_fn=os.setsid
             )
@@ -133,11 +165,15 @@ class RTLSDRReceiver:
                 demod_cmd,
                 stdin=self.process.stdout,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
                 text=True,
                 bufsize=1,
                 preexec_fn=os.setsid
             )
+
+            # Close stdout in parent so SIGPIPE propagates cleanly if demod_process exits
+            if self.process.stdout:
+                self.process.stdout.close()
 
             self.is_running = True
             self.start_time = time.time()
@@ -179,19 +215,24 @@ class RTLSDRReceiver:
         self.is_running = False
         self.status_message = "Stopped"
 
-        if self.demod_process:
-            try:
-                os.killpg(os.getpgid(self.demod_process.pid), signal.SIGTERM)
-            except Exception:
-                pass
-            self.demod_process = None
+        for proc in (self.demod_process, self.process):
+            if proc:
+                try:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+                except Exception:
+                    pass
 
-        if self.process:
-            try:
-                os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
-            except Exception:
-                pass
-            self.process = None
+        # Allow quick grace period then SIGKILL if needed
+        time.sleep(0.15)
+        for proc in (self.demod_process, self.process):
+            if proc and proc.poll() is None:
+                try:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                except Exception:
+                    pass
+
+        self.demod_process = None
+        self.process = None
 
     def get_stats(self) -> Dict[str, Any]:
         fps = 0.0
