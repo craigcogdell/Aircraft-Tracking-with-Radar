@@ -492,6 +492,49 @@ input[type="range"]::-webkit-slider-thumb {
     margin-top: 2px;
 }
 
+/* Compass & Heading Visualizer */
+.target-compass-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 10px;
+    margin-top: 10px;
+    box-shadow: inset 0 0 10px rgba(0, 255, 102, 0.05);
+}
+
+.target-compass-svg {
+    flex-shrink: 0;
+}
+
+.target-compass-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.target-compass-hdg {
+    font-size: 17px;
+    font-weight: bold;
+    color: var(--primary);
+    letter-spacing: 1px;
+    text-shadow: 0 0 6px var(--primary-glow);
+}
+
+.target-compass-spd {
+    font-size: 13px;
+    font-weight: bold;
+    color: var(--text-color);
+}
+
+.target-compass-sub {
+    font-size: 10px;
+    color: var(--text-dim);
+}
+
 /* Signal Strength Bar Meter */
 .signal-meter-bar {
     width: 100%;
