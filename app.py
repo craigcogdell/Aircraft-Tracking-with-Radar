@@ -32,13 +32,18 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 radar = RadarEngine()
 radar.set_station("Swansea Base (SA1 8LY)", 51.6214, -3.9436, 50.0)
 
-# Initialize SDR: check HackRF first; if HackRF board not connected, start Real-World Live Airspace Feed
+# Initialize SDR: check HackRF first; then RTL-SDR; if neither board connected, start Real-World Live Airspace Feed
 hackrf_check = HackRFReceiver.is_hackrf_available()
+rtlsdr_check = RTLSDRReceiver.is_rtlsdr_available()
+
 if hackrf_check.get("device_found"):
     logger.info("HackRF One USB hardware detected — starting 8 MSPS SDR receiver")
     radar.start_hackrf(lna_gain=40, vga_gain=42, amp=1, sample_rate=8000000)
+elif rtlsdr_check.get("device_found") and rtlsdr_check.get("available"):
+    logger.info("RTL-SDR USB dongle detected — starting RTL-SDR receiver")
+    radar.start_rtlsdr(gain=49.6, ppm=0, bias_tee=0, sample_rate=2000000)
 else:
-    logger.info("HackRF hardware in standby. Starting Real-World Live Airspace Feed (100% Real Physical Flights)")
+    logger.info("SDR hardware in standby. Starting Real-World Live Airspace Feed (100% Real Physical Flights)")
     radar.start_live_feed()
 
 class StationRequest(BaseModel):
@@ -119,7 +124,7 @@ async def get_sdr_diagnostics():
     bins = {
         "hackrf_transfer": shutil.which("hackrf_transfer"),
         "hackrf_info": shutil.which("hackrf_info"),
-        "rtl_sdr": shutil.which("rtl_sdr"),
+        "rtl_sdr": RTLSDRReceiver.get_rtl_sdr_binary(),
         "adsb_demod": os.path.join(BASE_DIR, "sdr", "adsb_demod"),
         "adsb_demod_exists": os.path.exists(os.path.join(BASE_DIR, "sdr", "adsb_demod"))
     }

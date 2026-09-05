@@ -14,6 +14,12 @@ if [ ! -f "sdr/adsb_demod" ]; then
     gcc -O3 sdr/adsb_demod.c -o sdr/adsb_demod -lm
 fi
 
+# Build RTL-SDR streaming utility if needed
+if [ ! -f "sdr/rtl_sdr" ]; then
+    echo "[*] Building RTL-SDR Mode-S streaming utility..."
+    gcc -O3 sdr/rtl_sdr.c -o sdr/rtl_sdr -ldl
+fi
+
 # Ensure Python venv exists
 if [ ! -d "venv" ]; then
     echo "[*] Initializing virtual environment..."
